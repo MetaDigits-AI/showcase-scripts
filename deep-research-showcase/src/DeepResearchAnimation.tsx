@@ -26,6 +26,9 @@ const DIVIDER = "rgba(0,0,0,0.20)";
 const BG_PAPER = "#FFFFFF";
 const BG_CANVAS = "#FAFAFA";
 
+const COMPACT_HEIGHT = 170;
+const FULL_HEIGHT = 340;
+
 const phases = [
   { label: "Planning search queries..." },
   { label: "Searching the web..." },
@@ -36,32 +39,16 @@ const phases = [
 const CheckIcon: React.FC<{ size?: number }> = ({ size = 16 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
     <circle cx="12" cy="12" r="12" fill={GREEN} />
-    <path
-      d="M9 12.5L11 14.5L15 10.5"
-      stroke="white"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
+    <path d="M9 12.5L11 14.5L15 10.5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
 
-const Spinner: React.FC<{ size?: number; frame: number }> = ({
-  size = 16,
-  frame,
-}) => {
+const Spinner: React.FC<{ size?: number; frame: number }> = ({ size = 16, frame }) => {
   const rotation = (frame * 8) % 360;
   return (
     <svg width={size} height={size} viewBox="0 0 24 24">
       <circle cx="12" cy="12" r="10" stroke={BLUE_ALPHA_15} strokeWidth="3" fill="none" />
-      <path
-        d="M12 2 A10 10 0 0 1 22 12"
-        stroke={BLUE}
-        strokeWidth="3"
-        fill="none"
-        strokeLinecap="round"
-        transform={`rotate(${rotation} 12 12)`}
-      />
+      <path d="M12 2 A10 10 0 0 1 22 12" stroke={BLUE} strokeWidth="3" fill="none" strokeLinecap="round" transform={`rotate(${rotation} 12 12)`} />
     </svg>
   );
 };
@@ -76,11 +63,7 @@ const Cite: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <span style={{ color: BLUE, fontWeight: 500, fontSize: 11 }}>{children}</span>
 );
 
-const SourceLink: React.FC<{
-  num: number;
-  title: string;
-  url: string;
-}> = ({ num, title, url }) => (
+const SourceLink: React.FC<{ num: number; title: string; url: string }> = ({ num, title, url }) => (
   <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginBottom: 5 }}>
     <span style={{ fontSize: 11, color: BLUE, fontWeight: 500 }}>[{num}]</span>
     <span style={{ fontSize: 11, color: BLUE }}>{title}</span>
@@ -90,38 +73,50 @@ const SourceLink: React.FC<{
 
 export const DeepResearchAnimation: React.FC = () => {
   const frame = useCurrentFrame();
-  const { fps, width, height } = useVideoConfig();
+  const { fps, width } = useVideoConfig();
 
   // ============================================
-  // Timeline (300 frames = 10s at 30fps)
+  // Timeline (356 frames = ~11.9s at 30fps)
+  //
+  // PROGRESS PHASE: 1.5x faster than v6 (snappy)
+  //   0-8:     Card fades in (compact)
+  //   8-35:    Query types in
+  //   35-55:   Phase 1 spinner → check
+  //   55-75:   Phase 2 spinner → check
+  //   75-95:   Phase 3 spinner → check
+  //   95-115:  Phase 4 spinner → check
+  //   115-130: Progress cross-fades out + card expands
+  //
+  // REPORT PHASE: same 0.7x leisurely pace as v6
+  //   120-148: Report summary fades in
+  //   148-178: Key Topics fade in
+  //   178-206: Recommended Practice fades in
+  //   206-235: Sources fade in
+  //   235-257: Chips fade in
+  //   178-330: Slow scroll up
+  //   330-356: Hold
   // ============================================
-  // 0-10:    Card fades in
-  // 10-45:   Query types in
-  // 45-75:   Phase 1 spinner → check
-  // 75-105:  Phase 2 spinner → check
-  // 105-130: Phase 3 spinner → check
-  // 130-155: Phase 4 spinner → check
-  // 155-170: Progress cross-fades out
-  // 155-180: Report summary fades in
-  // 180-200: Key Topics fade in
-  // 200-220: Recommended Practice fades in
-  // 220-240: Sources fade in
-  // 240-260: Chips fade in
-  // 200-290: Slow scroll up to reveal bottom content
-  // 290-300: Hold
 
-  const cardScale = spring({ frame, fps, from: 0.95, to: 1, durationInFrames: 20 });
-  const cardOpacity = interpolate(frame, [0, 10], [0, 1], { extrapolateRight: "clamp" });
+  const cardScale = spring({ frame, fps, from: 0.95, to: 1, durationInFrames: 15 });
+  const cardOpacity = interpolate(frame, [0, 8], [0, 1], { extrapolateRight: "clamp" });
+
+  // Card height: compact during progress, expands smoothly when report appears
+  const cardHeight = interpolate(frame, [110, 148], [COMPACT_HEIGHT, FULL_HEIGHT], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+    easing: Easing.out(Easing.cubic),
+  });
 
   const queryText = "Latest trends and key topics for AP Math test";
   const queryChars = Math.min(
     queryText.length,
-    Math.floor(interpolate(frame, [10, 45], [0, queryText.length], { extrapolateRight: "clamp" }))
+    Math.floor(interpolate(frame, [8, 35], [0, queryText.length], { extrapolateRight: "clamp" }))
   );
 
+  // Progress phases — snappy 20-frame durations
   const getPhaseState = (phaseIndex: number) => {
-    const phaseStarts = [45, 75, 105, 130];
-    const phaseDurations = [30, 30, 25, 25];
+    const phaseStarts = [35, 55, 75, 95];
+    const phaseDurations = [20, 20, 20, 20];
     const start = phaseStarts[phaseIndex];
     const end = start + phaseDurations[phaseIndex];
     if (frame < start) return "pending";
@@ -129,29 +124,28 @@ export const DeepResearchAnimation: React.FC = () => {
     return "complete";
   };
 
-  const progressWidth = interpolate(frame, [45, 155], [0, 100], {
+  const progressWidth = interpolate(frame, [35, 115], [0, 100], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
     easing: Easing.out(Easing.cubic),
   });
 
-  const reportOpacity = interpolate(frame, [155, 180], [0, 1], { extrapolateRight: "clamp" });
-  const reportSlide = interpolate(frame, [155, 180], [10, 0], { extrapolateRight: "clamp" });
-  const topicsOpacity = interpolate(frame, [180, 200], [0, 1], { extrapolateRight: "clamp" });
-  const practiceOpacity = interpolate(frame, [200, 220], [0, 1], { extrapolateRight: "clamp" });
-  const sourcesOpacity = interpolate(frame, [220, 240], [0, 1], { extrapolateRight: "clamp" });
-  const chipsOpacity = interpolate(frame, [240, 255], [0, 1], { extrapolateRight: "clamp" });
+  // Report phase — leisurely 0.7x pace
+  const reportOpacity = interpolate(frame, [120, 148], [0, 1], { extrapolateRight: "clamp" });
+  const topicsOpacity = interpolate(frame, [148, 178], [0, 1], { extrapolateRight: "clamp" });
+  const practiceOpacity = interpolate(frame, [178, 206], [0, 1], { extrapolateRight: "clamp" });
+  const sourcesOpacity = interpolate(frame, [206, 235], [0, 1], { extrapolateRight: "clamp" });
+  const chipsOpacity = interpolate(frame, [235, 257], [0, 1], { extrapolateRight: "clamp" });
 
-  // Scroll: the report content is taller than the card viewport.
-  // Smoothly scroll up to reveal sources + practice sections.
-  const scrollY = interpolate(frame, [200, 290], [0, 200], {
+  // Slow scroll to reveal full report
+  const scrollY = interpolate(frame, [178, 330], [0, 200], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
     easing: Easing.inOut(Easing.cubic),
   });
 
-  const showProgress = frame < 170;
-  const showReport = frame >= 155;
+  const showProgress = frame < 135;
+  const showReport = frame >= 120;
 
   return (
     <AbsoluteFill
@@ -163,11 +157,10 @@ export const DeepResearchAnimation: React.FC = () => {
         fontFamily: '"Inter", sans-serif',
       }}
     >
-      {/* Main card — fixed height with overflow hidden for scroll effect */}
       <div
         style={{
           width: width - 40,
-          height: height - 30,
+          height: cardHeight,
           opacity: cardOpacity,
           transform: `scale(${cardScale})`,
           backgroundColor: BG_PAPER,
@@ -179,7 +172,7 @@ export const DeepResearchAnimation: React.FC = () => {
           flexDirection: "column",
         }}
       >
-        {/* Header — stays fixed */}
+        {/* Header */}
         <div
           style={{
             padding: "10px 16px",
@@ -212,7 +205,7 @@ export const DeepResearchAnimation: React.FC = () => {
           </span>
         </div>
 
-        {/* Scrollable content area */}
+        {/* Content */}
         <div style={{ flex: 1, overflow: "hidden", position: "relative" }}>
           <div
             style={{
@@ -222,74 +215,29 @@ export const DeepResearchAnimation: React.FC = () => {
           >
             {/* Progress phases */}
             {showProgress && (
-              <div
-                style={{
-                  opacity: interpolate(frame, [155, 170], [1, 0], { extrapolateRight: "clamp" }),
-                }}
-              >
+              <div style={{ opacity: interpolate(frame, [115, 135], [1, 0], { extrapolateRight: "clamp" }) }}>
                 {phases.map((phase, i) => {
                   const state = getPhaseState(i);
                   return (
-                    <div
-                      key={i}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 8,
-                        marginBottom: 4,
-                        opacity: state === "pending" ? 0.35 : 1,
-                      }}
-                    >
-                      {state === "complete" ? (
-                        <CheckIcon size={16} />
-                      ) : state === "active" ? (
-                        <Spinner size={16} frame={frame} />
-                      ) : (
-                        <div style={{ width: 16, height: 16 }} />
-                      )}
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, opacity: state === "pending" ? 0.35 : 1 }}>
+                      {state === "complete" ? <CheckIcon size={16} /> : state === "active" ? <Spinner size={16} frame={frame} /> : <div style={{ width: 16, height: 16 }} />}
                       <span style={{ fontSize: 12, color: TEXT_PRIMARY }}>{phase.label}</span>
                     </div>
                   );
                 })}
-                <div
-                  style={{
-                    marginTop: 8,
-                    height: 4,
-                    backgroundColor: BLUE_ALPHA_15,
-                    borderRadius: 2,
-                    overflow: "hidden",
-                  }}
-                >
-                  <div
-                    style={{
-                      width: `${progressWidth}%`,
-                      height: "100%",
-                      backgroundColor: BLUE,
-                      borderRadius: 2,
-                    }}
-                  />
+                <div style={{ marginTop: 8, height: 4, backgroundColor: BLUE_ALPHA_15, borderRadius: 2, overflow: "hidden" }}>
+                  <div style={{ width: `${progressWidth}%`, height: "100%", backgroundColor: BLUE, borderRadius: 2 }} />
                 </div>
               </div>
             )}
 
-            {/* ============================================ */}
-            {/* REPORT CONTENT                               */}
-            {/* ============================================ */}
+            {/* REPORT */}
             {showReport && (
-              <div style={{ opacity: reportOpacity, transform: `translateY(${interpolate(frame, [155, 180], [10, 0], { extrapolateRight: "clamp" })}px)` }}>
+              <div style={{ opacity: reportOpacity, transform: `translateY(${interpolate(frame, [120, 148], [10, 0], { extrapolateRight: "clamp" })}px)` }}>
 
-                {/* Summary — brief overview */}
-                <div
-                  style={{
-                    backgroundColor: BLUE_LIGHT,
-                    borderRadius: 8,
-                    padding: "8px 12px",
-                    marginBottom: 10,
-                  }}
-                >
-                  <div style={{ fontSize: 13, fontWeight: 600, color: TEXT_PRIMARY, marginBottom: 4 }}>
-                    Summary
-                  </div>
+                {/* Summary */}
+                <div style={{ backgroundColor: BLUE_LIGHT, borderRadius: 8, padding: "8px 12px", marginBottom: 10 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: TEXT_PRIMARY, marginBottom: 4 }}>Summary</div>
                   <div style={{ fontSize: 11, lineHeight: 1.55, color: TEXT_SECONDARY }}>
                     The 2026 AP Calculus AB/BC and AP Statistics exams emphasize
                     application-based reasoning over rote computation. College Board
@@ -298,44 +246,28 @@ export const DeepResearchAnimation: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Key Topics — specific, sharp */}
+                {/* Key Topics */}
                 <div style={{ opacity: topicsOpacity }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: TEXT_PRIMARY, marginBottom: 4 }}>
-                    Key Topics by Exam Weight
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 11,
-                      color: TEXT_SECONDARY,
-                      lineHeight: 1.55,
-                      marginBottom: 10,
-                      borderLeft: `3px solid ${BLUE}`,
-                      paddingLeft: 10,
-                    }}
-                  >
+                  <div style={{ fontSize: 13, fontWeight: 600, color: TEXT_PRIMARY, marginBottom: 4 }}>Key Topics by Exam Weight</div>
+                  <div style={{ fontSize: 11, color: TEXT_SECONDARY, lineHeight: 1.55, marginBottom: 10, borderLeft: `3px solid ${BLUE}`, paddingLeft: 10 }}>
                     <div style={{ marginBottom: 2 }}>
                       <span style={{ fontWeight: 500, color: TEXT_PRIMARY }}>Calc AB:</span>{" "}
-                      Limits & continuity (10-12%), derivatives of composite functions, FTC Parts I & II,
-                      related rates, optimization <Cite>[1][2]</Cite>
+                      Limits & continuity (10-12%), derivatives of composite functions, FTC Parts I & II, related rates, optimization <Cite>[1][2]</Cite>
                     </div>
                     <div style={{ marginBottom: 2 }}>
                       <span style={{ fontWeight: 500, color: TEXT_PRIMARY }}>Calc BC:</span>{" "}
-                      Parametric/polar/vector functions, Taylor & Maclaurin series,
-                      convergence tests (ratio, comparison), Euler's method <Cite>[1][3]</Cite>
+                      Parametric/polar/vector functions, Taylor & Maclaurin series, convergence tests (ratio, comparison), Euler's method <Cite>[1][3]</Cite>
                     </div>
                     <div>
                       <span style={{ fontWeight: 500, color: TEXT_PRIMARY }}>Statistics:</span>{" "}
-                      Inference for regression slopes (new), chi-square tests,
-                      experimental design, probability distributions <Cite>[4]</Cite>
+                      Inference for regression slopes (new), chi-square tests, experimental design, probability distributions <Cite>[4]</Cite>
                     </div>
                   </div>
                 </div>
 
                 {/* Recommended Practice */}
                 <div style={{ opacity: practiceOpacity }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: TEXT_PRIMARY, marginBottom: 4 }}>
-                    Recommended Practice Sets
-                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: TEXT_PRIMARY, marginBottom: 4 }}>Recommended Practice Sets</div>
                   <div style={{ fontSize: 11, color: TEXT_SECONDARY, lineHeight: 1.55, marginBottom: 10 }}>
                     <div style={{ display: "flex", gap: 6, marginBottom: 3, alignItems: "flex-start" }}>
                       <span style={{ color: BLUE, fontWeight: 600, flexShrink: 0 }}>01</span>
@@ -353,25 +285,8 @@ export const DeepResearchAnimation: React.FC = () => {
                 </div>
 
                 {/* Sources */}
-                <div
-                  style={{
-                    opacity: sourcesOpacity,
-                    borderTop: `1px solid ${DIVIDER}`,
-                    paddingTop: 8,
-                    marginTop: 4,
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: 12,
-                      fontWeight: 500,
-                      color: TEXT_PRIMARY,
-                      marginBottom: 5,
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 4,
-                    }}
-                  >
+                <div style={{ opacity: sourcesOpacity, borderTop: `1px solid ${DIVIDER}`, paddingTop: 8, marginTop: 4 }}>
+                  <div style={{ fontSize: 12, fontWeight: 500, color: TEXT_PRIMARY, marginBottom: 5, display: "flex", alignItems: "center", gap: 4 }}>
                     <span>Sources</span>
                     <span style={{ fontSize: 10, color: TEXT_SECONDARY, fontWeight: 400 }}>(34)</span>
                   </div>
@@ -383,51 +298,17 @@ export const DeepResearchAnimation: React.FC = () => {
                 </div>
 
                 {/* Metadata chips */}
-                <div
-                  style={{
-                    display: "flex",
-                    gap: 6,
-                    marginTop: 10,
-                    opacity: chipsOpacity,
-                    transform: `translateY(${interpolate(frame, [240, 255], [6, 0], { extrapolateRight: "clamp" })}px)`,
-                  }}
-                >
+                <div style={{ display: "flex", gap: 6, marginTop: 10, opacity: chipsOpacity, transform: `translateY(${interpolate(frame, [235, 257], [6, 0], { extrapolateRight: "clamp" })}px)` }}>
                   {["2 rounds", "8 queries", "34 sources"].map((label) => (
-                    <div
-                      key={label}
-                      style={{
-                        fontSize: 10,
-                        fontWeight: 500,
-                        color: TEXT_SECONDARY,
-                        padding: "3px 8px",
-                        borderRadius: 10,
-                        border: `1px solid ${DIVIDER}`,
-                        backgroundColor: BG_PAPER,
-                      }}
-                    >
+                    <div key={label} style={{ fontSize: 10, fontWeight: 500, color: TEXT_SECONDARY, padding: "3px 8px", borderRadius: 10, border: `1px solid ${DIVIDER}`, backgroundColor: BG_PAPER }}>
                       {label}
                     </div>
                   ))}
                 </div>
 
-                {/* Mathos logo watermark — bottom right */}
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "flex-end",
-                    alignItems: "center",
-                    gap: 4,
-                    marginTop: 12,
-                    opacity: 0.5,
-                  }}
-                >
-                  <Img
-                    src={staticFile("mathos-cube.png")}
-                    style={{ width: 14, height: 14 }}
-                  />
-                  <span style={{ fontSize: 10, fontWeight: 600, color: TEXT_SECONDARY }}>
-                    Mathos AI
-                  </span>
+                {/* Mathos full logo watermark */}
+                <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12, opacity: 0.6 }}>
+                  <Img src={staticFile("mathos-logo-full.png")} style={{ height: 16 }} />
                 </div>
               </div>
             )}
