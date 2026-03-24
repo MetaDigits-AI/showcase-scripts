@@ -306,13 +306,24 @@ export const DeepResearchAnimation: React.FC = () => {
                   ))}
                 </div>
 
-                {/* Mathos full logo watermark */}
-                <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12, opacity: 0.6 }}>
-                  <Img src={staticFile("mathos-logo-full.png")} style={{ height: 16 }} />
-                </div>
               </div>
             )}
           </div>
+        </div>
+
+        {/* Fixed footer — always visible at bottom of card */}
+        <div
+          style={{
+            padding: "4px 16px 6px",
+            display: "flex",
+            justifyContent: "flex-end",
+            alignItems: "center",
+            flexShrink: 0,
+            borderTop: `1px solid ${DIVIDER}`,
+            backgroundColor: BG_PAPER,
+          }}
+        >
+          <Img src={staticFile("mathos-logo-full.png")} style={{ height: 14, opacity: 0.5 }} />
         </div>
       </div>
     </AbsoluteFill>
